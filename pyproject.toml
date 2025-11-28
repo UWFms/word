@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "docling-chat-bot"
+version = "0.1.0"
+description = "FastAPI service for searching a Word document using docling"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [
+    { include = "docling_chat_bot", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.34.0" }
+pydantic = "^2.4.0"
+python-dotenv = "^1.0.0"
+pyyaml = "^6.0.1"
+docling = "*"
+pymilvus = "^2.2.4"
+openai = "^1.17.0"
+langchain-milvus = "^0.3.0"
+langchain-openai = "^1.1.0"
+
+[build-system]
+requires = ["poetry-core>=1.6.0"]
+build-backend = "poetry.core.masonry.api"
