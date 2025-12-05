@@ -45,6 +45,27 @@ class HealthResponse(BaseModel):
     doc_loaded: bool
 
 
+class SectionChunksRequest(BaseModel):
+    document_name: str
+    chunk_index: int
+    depth: int = 1
+
+
+class SectionChunkHit(BaseModel):
+    chunk_index: int
+    document_name: str
+    text: str | None = None
+    headings: list[str] | None = None
+    metadata: Dict[str, Any] | None = None
+
+
+class SectionChunksResponse(BaseModel):
+    depth_used: int
+    target_heading: str | None
+    results: list[SectionChunkHit]
+    message: str | None = None
+
+
 def _extract_headings_from_meta(meta_str: str) -> list[str] | None:
     """
     meta_str — это строка вида:
@@ -64,6 +85,28 @@ def _extract_headings_from_meta(meta_str: str) -> list[str] | None:
     headings = [v.strip() for v in values if v.strip()]
 
     return headings or None
+
+def _headings_from_metadata(meta_full: Dict[str, Any]) -> list[str] | None:
+    """Extract headings from metadata JSON or embedded meta string."""
+
+    if not meta_full:
+        return None
+
+    if "headings" in meta_full and isinstance(meta_full["headings"], list):
+        normalized: list[str] = []
+        for h in meta_full["headings"]:
+            text = str(h).strip()
+            if text:
+                normalized.append(text)
+        if normalized:
+            return normalized
+
+    if "meta" in meta_full and isinstance(meta_full["meta"], str):
+        return _extract_headings_from_meta(meta_full["meta"])
+
+    return None
+
+
 
 
 def _extract_text_and_metadata(chunk: Any, idx: int, document_name: str) -> tuple[str, Dict[str, Any]]:
@@ -257,3 +300,88 @@ def similar(payload: SimilarRequest):
         )
 
     return SimilarResponse(results=hits)
+
+
+@router.post("/api/v1/doc/chunks-by-heading", response_model=SectionChunksResponse)
+def chunks_by_heading(payload: SectionChunksRequest):
+    """
+    Возвращает все чанки документа, находящиеся на том же уровне оглавления.
+
+    depth=1 — подраздел (последний элемент headings), depth=2 — родительский раздел и т.д.
+    """
+
+    if payload.depth < 1:
+        depth_requested = 1
+    else:
+        depth_requested = payload.depth
+
+    try:
+        doc_chunks = milvus_store.client.query(
+            collection_name=properties.MILVUS_COLLECTION_NAME,
+            filter=f"metadata['document_name'] == \"{payload.document_name}\"",
+            output_fields=["text", "metadata"],
+            limit=10000,
+        )
+    except Exception as e:
+        logger.error(f"Milvus query failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Milvus query failed: {e}")
+
+    if not doc_chunks:
+        raise HTTPException(status_code=404, detail="Document not found in Milvus")
+
+    def _as_int(val: Any) -> int | None:
+        try:
+            return int(val)
+        except Exception:
+            return None
+
+    target_chunk = None
+    for ch in doc_chunks:
+        meta = (ch.get("metadata") or {}) if isinstance(ch, dict) else {}
+        if _as_int(meta.get("chunk_index")) == payload.chunk_index:
+            target_chunk = ch
+            break
+
+    if not target_chunk:
+        raise HTTPException(status_code=404, detail="Chunk not found in document")
+
+    target_meta = target_chunk.get("metadata") or {}
+    headings = _headings_from_metadata(target_meta)
+
+    if not headings:
+        return SectionChunksResponse(
+            depth_used=0,
+            target_heading=None,
+            results=[],
+            message="У выбранного чанка не обнаружен раздел",
+        )
+
+    depth_used = min(depth_requested, len(headings))
+    target_heading = headings[-depth_used]
+
+    matches: list[SectionChunkHit] = []
+    for ch in doc_chunks:
+        meta = (ch.get("metadata") or {}) if isinstance(ch, dict) else {}
+        chunk_headings = _headings_from_metadata(meta) or []
+
+        if target_heading not in chunk_headings:
+            continue
+
+        idx_val = _as_int(meta.get("chunk_index"))
+        match = SectionChunkHit(
+            chunk_index=idx_val if idx_val is not None else -1,
+            document_name=str(meta.get("document_name", payload.document_name)),
+            text=ch.get("text"),
+            headings=chunk_headings or None,
+            metadata=meta or None,
+        )
+        matches.append(match)
+
+    matches.sort(key=lambda m: m.chunk_index)
+
+    return SectionChunksResponse(
+        depth_used=depth_used,
+        target_heading=target_heading,
+        results=matches,
+        message=None,
+    )
