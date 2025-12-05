@@ -23,6 +23,10 @@ class Properties:
     LLM_MODEL_NAME: str | None = os.getenv("LLM_MODEL_NAME")
     LLM_CATALOG_ID_YANDEX: str | None = os.getenv("LLM_CATALOG_ID_YANDEX")
     LLM_REQUEST_TIMEOUT: int = int(os.getenv("LLM_REQUEST_TIMEOUT", "120"))
+    LLM_TOKENIZE_CONNECT_TIMEOUT: float = float(
+        os.getenv("LLM_TOKENIZE_CONNECT_TIMEOUT", "1.0")
+    )
+    LLM_TOKENIZE_TIMEOUT: float = float(os.getenv("LLM_TOKENIZE_TIMEOUT", "3.0"))
     LLM_MODEL_MAX_TOKEN_INPUT: int = int(os.getenv("LLM_MODEL_MAX_TOKEN_INPUT", "32000"))
     LLM_MODEL_MAX_TOKEN_OUTPUT: int = int(os.getenv("LLM_MODEL_MAX_TOKEN_OUTPUT", "1000"))
     POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "localhost")

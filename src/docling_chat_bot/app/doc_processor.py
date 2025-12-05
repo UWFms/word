@@ -1,10 +1,13 @@
 from typing import List
+from typing import List, Optional
 
+import time
 import docling.backend.msword_backend as msb  # type: ignore
-from docling.chunking import HierarchicalChunker
+from docling.chunking import HybridChunker
 from docling.document_converter import DocumentConverter, InputFormat, WordFormatOption
 
 from docling_chat_bot.app.logger import logger
+from docling_chat_bot.app.tokenization import YandexTokenizer
 
 # Флаг, чтобы патчить обработчик формул только один раз
 _EQUATIONS_PATCHED: bool = False
@@ -74,10 +77,58 @@ class DocProcessor:
         doc = result.document
         logger.info("Document successfully converted to docling representation")
 
-        # Иерархическое чанкование
-        chunker = HierarchicalChunker()
-        chunks = list(chunker.chunk(doc))
-        logger.info(f"Document chunked into {len(chunks)} segments")
+        # Токен-осведомлённое чанкование
+        tokenizer = YandexTokenizer()
+        max_tokens = tokenizer.get_max_tokens()
+        logger.info(
+            "Running HybridChunker with Yandex tokenizer (connect_timeout=%ss, read_timeout=%ss, max_tokens=%s)...",
+            tokenizer.connect_timeout_seconds,
+            tokenizer.timeout_seconds,
+            max_tokens,
+        )
+        if not tokenizer._is_api_reachable():
+            logger.warning(
+                "Yandex tokenize endpoint %s is not reachable; HybridChunker will use "
+                "word-based estimates for chunk sizing.",
+                tokenizer.api_url,
+            )
+
+        chunker = HybridChunker(tokenizer=tokenizer)
+
+        start_time = time.perf_counter()
+        chunks = []
+        try:
+            for idx, chunk in enumerate(chunker.chunk(doc)):
+                chunk_text: Optional[str] = getattr(chunk, "text", None) or getattr(
+                    chunk, "content", None
+                )
+                text_preview = (chunk_text or "").strip().replace("\n", " ")
+                if len(text_preview) > 120:
+                    text_preview = text_preview[:117] + "..."
+
+                meta_summary = getattr(chunk, "metadata", {}) or {}
+                heading_meta = meta_summary.get("headings") or meta_summary.get(
+                    "heading"
+                )
+                logger.debug(
+                    "Chunk %s: text_len=%s, headings=%s, preview='%s'",
+                    idx,
+                    len(chunk_text or ""),
+                    heading_meta,
+                    text_preview,
+                )
+                chunks.append(chunk)
+        except Exception:
+            logger.error("HybridChunker failed while chunking the document", exc_info=True)
+            raise
+
+        elapsed = time.perf_counter() - start_time
+        logger.info(
+            "Document chunked into %s segments in %.2fs (max_tokens=%s)",
+            len(chunks),
+            elapsed,
+            max_tokens,
+        )
 
         # Добавим имя документа в метаданные каждого чанка
         for ch in chunks:
