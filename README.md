@@ -12,6 +12,7 @@
 
 ```bash
     # create and activate a virtual environment (Windows)
+    cd src
     py -m venv .venv
     .\.venv\Scripts\activate
     
@@ -43,6 +44,9 @@
 
 Backend предоставляет HTTP-эндпоинты для индексации документов в Milvus и поиска похожих фрагментов текста (чанков),
 извлечённых с помощью Docling.
+
+Чанкование выполняется гибридным HybridChunker из Docling.
+Для оценки размера чанков используется токенизатор Яндекса с тайм‑аутами.
 
 Документы для индексации помещаются в папку uploads/.
 При вызове index каждый .docx-файл обрабатывается, разбивается на чанки, и сохраняется в Milvus.
@@ -86,6 +90,26 @@ metadata    object / null   Метаданные: headings + document_name + chu
 "headings": ["2 ", "2.4 ", "2.4.1 "],
 "document_name": "WKR.docx"
 }
+
+### POST /api/v1/doc/chunks-by-heading
+
+Возвращает последовательность чанков выбранного документа, находящихся на том же уровне оглавления, что и указанный чанк.
+
+**Request body (application/json)**
+
+Поле            Тип      Описание
+document_name   string   Имя документа (как при индексации).
+chunk_index     integer  Индекс целевого чанка.
+depth           integer  Глубина уровня headings: 1 — подраздел (последний элемент), 2 — родительский раздел и т.д.
+
+**Ответ**
+
+Поле             Тип                Описание
+depth_used       integer            Какой уровень headings фактически применён (если запрошенный больше длины списка).
+target_heading   string / null      Значение headings, по которому фильтровались результаты.
+results          array of objects   Чанки с тем же разделом, отсортированные по chunk_index.
+message          string / null      Сообщение о пустом оглавлении (если headings нет у целевого чанка).
+
 
 ### GET /health
 
