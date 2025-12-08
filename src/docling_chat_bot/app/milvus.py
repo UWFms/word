@@ -4,8 +4,8 @@ from langchain_milvus.vectorstores import Milvus
 from langchain_openai import OpenAIEmbeddings
 from pymilvus import MilvusClient, DataType
 
-from docling_chat_bot.app.config import properties
-from docling_chat_bot.app.logger import logger
+from .config.config import properties
+from .logger import logger
 
 TEXT_EMBEDDING_DIM = "тест"
 

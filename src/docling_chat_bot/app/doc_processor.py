@@ -1,13 +1,12 @@
-from typing import List
+import time
 from typing import List, Optional
 
-import time
 import docling.backend.msword_backend as msb  # type: ignore
 from docling.chunking import HybridChunker
 from docling.document_converter import DocumentConverter, InputFormat, WordFormatOption
 
-from docling_chat_bot.app.logger import logger
-from docling_chat_bot.app.tokenization import YandexTokenizer
+from .logger import logger
+from .tokenization import YandexTokenizer
 
 # Флаг, чтобы патчить обработчик формул только один раз
 _EQUATIONS_PATCHED: bool = False

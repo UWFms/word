@@ -4,8 +4,8 @@ import requests
 from docling_core.transforms.chunker.tokenizer.base import BaseTokenizer
 from pydantic import ConfigDict, PrivateAttr
 
-from docling_chat_bot.app.config import properties
-from docling_chat_bot.app.logger import logger
+from .config.config import properties
+from .logger import logger
 
 
 class YandexTokenizer(BaseTokenizer):

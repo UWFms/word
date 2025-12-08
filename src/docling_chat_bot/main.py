@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from docling_chat_bot.app.api.routes import router
+from .app.api.routes import router
 
 app = FastAPI(
     title="Docling API",

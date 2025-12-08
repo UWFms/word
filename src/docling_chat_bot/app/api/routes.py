@@ -6,10 +6,10 @@ from typing import List, Any, Dict
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from docling_chat_bot.app.config import properties
-from docling_chat_bot.app.doc_processor import DocProcessor
-from docling_chat_bot.app.logger import logger
-from docling_chat_bot.app.milvus import (
+from ..config.config import properties
+from ..doc_processor import DocProcessor
+from ..logger import logger
+from ..milvus import (
     milvus_store,
     recreate_collection,
     search_embeddings,
@@ -86,6 +86,7 @@ def _extract_headings_from_meta(meta_str: str) -> list[str] | None:
 
     return headings or None
 
+
 def _headings_from_metadata(meta_full: Dict[str, Any]) -> list[str] | None:
     """Extract headings from metadata JSON or embedded meta string."""
 
@@ -105,8 +106,6 @@ def _headings_from_metadata(meta_full: Dict[str, Any]) -> list[str] | None:
         return _extract_headings_from_meta(meta_full["meta"])
 
     return None
-
-
 
 
 def _extract_text_and_metadata(chunk: Any, idx: int, document_name: str) -> tuple[str, Dict[str, Any]]:
